@@ -1,6 +1,6 @@
 def sel_options(options,options_name:str='département'):
     '''
-    Cette fonction permet de demander à l’utilisateur de sélectionner une ou plusieur options.
+    Cette fonction permet de demander à l’utilisateur de sélectionner une ou plusieurs options.
 
     INPUT
     options (list) La liste des options disponibles
@@ -10,8 +10,7 @@ def sel_options(options,options_name:str='département'):
     user_choice (list) la liste des numéros entrés par l’utilisateur (dtype str)
     '''
     #D’abord j’affiche la liste des options
-    print()
-    print('**LISTE DES OPTIONS**')
+    print('\n**LISTE DES OPTIONS**')
     for opts in options:
         print(opts)
     print()
@@ -39,7 +38,7 @@ def sel_options(options,options_name:str='département'):
 
 def sel_indicateur (indicateur:str='0'):
     '''
-    Cette fonction permet de demander à l’utilisateur de sélectionner un indicateur parmis : rendements, production, et surfaces
+    Cette fonction permet de demander à l’utilisateur de sélectionner un indicateur parmi : rendements, production, et surfaces
     
     INPUT
     indicateur (str)(optionnel: defaut = '0') '1' rendements, '2' production, '3' surface
