@@ -1,17 +1,11 @@
-import os
-import glob
-import sys
 import math
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
-# IMPORTATIONS de scripts maison
-
-fonctions_dir="/media/cl-ment-devenet/Partage/work/TEF/code/fonctions_communes/"
-sys.path.append(fonctions_dir)
-
-from fonctions import *
+from config import BDD_SWI_AVEC_DEPARTEMENTS, BDD_SWI_DATA_PATH, OUTPUT_DATA_PATH
+from fonctions_communes.fonctions import sel_options
 
 #FONCTIONS
 
@@ -21,8 +15,10 @@ def Retrieve_data_SWI(departements_a_tracer:list=[],months:list=[]):
     Cette fonction est conçue spécifiquement pour alimenter la fonction `Plot_data()` associée.
     
     INPUTS
-    departements_a_tracer (list) Optionnel La liste des numéros de départements à récupérer. Numéro à deux chiffres passé en tant que chaîne de caractère (e.g. ['02','08','77'])
-    months (list) Optionnel La liste des numéros (int) de mois à récupérer ; si plusieurs mois demandés, la fonction renvoi le SWI moyen ; si liste vide, la moyenne annuelle est renvoyée.
+    - departements_a_tracer (list) Optionnel La liste des numéros de départements à récupérer. Numéro à deux chiffres passé en tant que chaîne de
+    caractères (e.g. ['02','08','77'])
+    - months (list) Optionnel La liste des numéros (int) de mois à récupérer ; si plusieurs mois demandés, la fonction renvoie le SWI moyen ; si
+    liste vide, la moyenne annuelle est renvoyée.
 
     OUTPUTS
     data (dict) Le dictionnaire des données récupérées. data={'dept':[valeurs]}
@@ -31,14 +27,7 @@ def Retrieve_data_SWI(departements_a_tracer:list=[],months:list=[]):
     metadonnees (pandas.DataFrame) Le dataframe contenant pour chaque maille de la grille SAFRAN : son numéro, ses coordonnées, le nom du département, le numéro du département, le numéro de la région. Ces données sont issues du fichier CSV créé par le script joindre_numeros_de_mailles_et_departements.py
     '''
 
-    #Le chemin du répertoire où je stocke mes données
-    bddpath='/media/cl-ment-devenet/Partage/bdd'
-
-    #Le chemin en absolu du fichier de données. glob fonctionne comme `ls` en bash et permet d’intégrer des "*"
-    dirpath=glob.glob(os.path.join(bddpath,"METEOFRANCE/SWI/SWI_Package*"))[0]
-    metadonnees_path=glob.glob(os.path.join(bddpath,"METEOFRANCE/SWI/*meta*"))[0]
-
-    metadonnees=pd.read_csv(metadonnees_path[:-4]+'_wt_dep_reg.csv',sep=';')
+    metadonnees=pd.read_csv(BDD_SWI_AVEC_DEPARTEMENTS,sep=';')
 
     #Traitement des cas où les arguments departements_a_tracer et months ne sont pas passés.
     if len(departements_a_tracer)==0:
@@ -55,18 +44,18 @@ def Retrieve_data_SWI(departements_a_tracer:list=[],months:list=[]):
         maxi_num_maille = max(mailles_a_recup)
 
         #Réduction de la liste des fichiers de données à lire à ceux contenant les mailles recherchées
-        all_fpaths=[os.path.basename(fp) for fp in glob.glob(os.path.join(bddpath,dirpath,"*"))]    #Liste de tous les fichiers de données
+        all_fpaths=[fp for fp in Path.glob(BDD_SWI_DATA_PATH, '*')]    #Liste de tous les fichiers de données
         files_to_open=[]
         for fname in all_fpaths:
-            prem_maille = int(fname.split('.')[1].split('-')[0])    #Numéro de la première maille disponible dans ce fichier
-            der_maille = int(fname.split('.')[1].split('-')[1])     #Numéro de la dernière maille disponible dans ce fichier
+            prem_maille = int(fname.name.split('.')[1].split('-')[0])    #Numéro de la première maille disponible dans ce fichier
+            der_maille = int(fname.name.split('.')[1].split('-')[1])     #Numéro de la dernière maille disponible dans ce fichier
             if not ((prem_maille<mini_num_maille)&(der_maille<mini_num_maille))|((prem_maille>maxi_num_maille)&(der_maille>maxi_num_maille)):   #Vérification que le fichier contient au moins une maille recherchée
                 files_to_open.append(fname)
 
         #Ouverture des fichiers de données et enregistrement des données des mailles recherchées dans un dataframe temporaire
         initialized=False
         for fname in files_to_open:
-            temp_df=pd.read_csv(os.path.join(dirpath,fname),sep=';').drop(columns=['LAMBX','LAMBY'])
+            temp_df=pd.read_csv(fname,sep=';').drop(columns=['LAMBX','LAMBY'])
             temp_df=temp_df[temp_df['NUMERO'].isin(mailles_a_recup)]
             if not initialized:
                 raw_data=temp_df.copy()
@@ -111,7 +100,7 @@ def Plot_data(data,months,departements_a_tracer,metadonnees):
     titre = f'Soil Wetness Indicator (SWI) UNIFORM\nfor months {months}'
     indicateur_name = 'SWI_UNIF'
     unit = '-'
-    savename = f'{indicateur_name}_dep_{'-'.join(departements_a_tracer)}_month_{'-'.join([str(m) for m in months])}.png'
+    savename = OUTPUT_DATA_PATH / f'{indicateur_name}_dep_{"-".join(departements_a_tracer)}_month_{"-".join([str(m) for m in months])}.png'
 
     #Paramètres de la figure
     nb_subplots=len(departements_a_tracer)
@@ -123,7 +112,7 @@ def Plot_data(data,months,departements_a_tracer,metadonnees):
     fig, axs = plt.subplots(nb_rows, nb_columns,sharex=True,sharey=True,clear=True,figsize=(12*nb_columns,10*nb_rows))
     fig.suptitle(titre,fontweight='bold',fontsize=20)
 
-    #Gestion du cas où il n’y aurai qu’une région, donc qu’un graph à tracer
+    #Gestion du cas où il n’y aurait qu’une région, donc qu’un graph à tracer
     if not isinstance(axs,np.ndarray):
         axs=np.array([axs])
     else:
@@ -142,12 +131,12 @@ def Plot_data(data,months,departements_a_tracer,metadonnees):
         axs[i].grid(visible=True)
 
     plt.savefig(savename)
-    print(f'Figure enregistrée sous :\n{os.path.abspath(savename)}')
+    print(f'Figure enregistrée sous :\n{(savename)}')
     plt.show()
 
 #EXECUTION
 #Le bloc est commenté pour qu’il ne s’exécute pas lors de l’appel du script par correl.py
 
-#Plot_data(*Retrieve_data_SWI(
-#               departements_a_tracer=['02','10','27','28','45','51','60','77','78','89','91','95']
-#               ))
+Plot_data(*Retrieve_data_SWI(
+               departements_a_tracer=['02','10','27','28','45','51','60','77','78','89','91','95']
+               ))

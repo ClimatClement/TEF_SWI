@@ -1,8 +1,8 @@
-import os
-import glob
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
+
+from config import BDD_CONTOURS_DEPARTEMENTS_PATH, BDD_SWI_AVEC_DEPARTEMENTS, BDD_SWI_METADATA_PATH
 
 '''
 Le SWI UNIFORME de MétéoFrance est fourni sur la grille SAFRAN. Cette grille est composée de plusieurs milliers de points.
@@ -12,16 +12,11 @@ Ce code joint les métadonnées SWI UNIFORME et le découpage départemental iss
 Le résultat est un fichier CSV (sep = ';') contenant la liste des mailles, le nom du département, le numéro INSEE de département et le numéro INSEE de la région.
 '''
 
-#Le chemin du répertoire où je stocke mes données
-bddpath='/media/cl-ment-devenet/Partage/bdd'
-
-### On récupère donc les métadonnées de la grille SAFRAN
-metadonnees_path=glob.glob(os.path.join(bddpath,"METEOFRANCE/SWI/*meta*"))[0]
-df_metadonnees=pd.read_csv(metadonnees_path,sep=';',header=4)
+### On récupère les métadonnées de la grille SAFRAN
+df_metadonnees=pd.read_csv(BDD_SWI_METADATA_PATH,sep=';',header=4)
 
 ### On récupère ensuite les limites administratives des départements (France métropolitaine)
-limit_depts_path=glob.glob(os.path.join(bddpath,"IGN/BDTOPO/Source/ADMIN*/ADMIN*/1_*/*/DEPARTEMENT.shp"))[0]
-limit_depts=gpd.read_file(limit_depts_path)
+limit_depts=gpd.read_file(BDD_CONTOURS_DEPARTEMENTS_PATH)
 
 ### Petite transformation du dataframe des métadonnées SAFRAN en Geodataframe
 geometry = [Point(xy) for xy in zip(df_metadonnees['lambx93'], df_metadonnees['lamby93'])]
@@ -34,7 +29,7 @@ gdf_result = gpd.sjoin(
     how='left'
     )
 
-### Les mailles litoralles dont le centre est en mer n’intersectent aucun département
+### Les mailles littorales dont le centre est en mer n’intersectent aucun département
 ### Il faut donc une étape supplémentaire pour celles-ci
 ### D’abord on isole ces mailles
 coast_points = gdf_result[gdf_result['INSEE_DEP'].isna()]
@@ -53,5 +48,4 @@ gdf_result.update(nearest_join)
 ### On dispose à présent de la liste des mailles de la grille SAFRAN labellisée avec le département et la région
 ### On enregistre ces métadonnées améliorées
 ### La géométrie ne peut pas être enregistrée tel quel au format CSV et comme on n’en a plus besoin on la laisse tomber.
-gdf_result.drop(columns='geometry').to_csv(metadonnees_path[:-4]+'_wt_dep_reg.csv', index=False,sep=';')
-print(f"Fichier enregistré sous : {os.path.abspath(metadonnees_path[:-4]+'_wt_dep_reg.csv')}")
+gdf_result.drop(columns='geometry').to_csv(BDD_SWI_AVEC_DEPARTEMENTS, index=False, sep=';')

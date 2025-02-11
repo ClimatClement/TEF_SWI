@@ -1,0 +1,16 @@
+name: tef-swi
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pandas
+  - pandas-stubs
+  - geopandas
+  - matplotlib
+  - numpy
+  - pygeos
+platforms:
+  - osx-arm64
+  - osx-64
+  - win-64
+  - linux-64
