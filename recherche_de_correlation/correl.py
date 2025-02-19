@@ -102,44 +102,92 @@ def Plot_TS_and_scatter_SAA_SWI(SWI,SAA,cultures_a_tracer,months,month_names,off
 
     plt.savefig(savename)
     print(f'Figure enregistrée sous :\n{os.path.abspath(savename)}')
-#    plt.show()
+    plt.show()
 
-def Plot_scatter_SAA_SWI(SWI,SAA,departements_a_tracer,cultures_a_tracer,months,month_names,offset,anom:bool=False,colors:dict={}):
+def Plot_scatter_SAA_SWI(SWI,SAA,departements_a_tracer,cultures_a_tracer,months,month_names,indicateur_dict,metadonnees,annees,colored_by:str='culture',offset:int=0,anom:bool=False,colors:list=['blue','orange','green']):
     '''
-    Description à venir
+    Cette fonction trace un unique nuage de point des rendements annuels (ordonnées) en fonction du SWI (abscisses). Il est possible de colorer les points selon le type de culture ou selon le département.
+
+    INPUTS
+    SWI (dict={str:pandas.DataFrame})   Les données de SWI issues de la fonction Retrieve_data_SWI
+    SAA (dict={str:dict={str:pandas.DataFrame}})    Les données de SWI issues de la fonction Retrieve_data_SAA
+    departements_a_tracer (list=[str]) La liste des départements à tracer (liste de strings à 2 digits)
+    cultures_a_tracer (list=[str])  La liste des cultures à tracer. Numéro à deux chiffres passé en tant que chaîne de caractère (e.g. ['01','04']). La nomenclature est propre à cette fonction. Passez une liste vide pour que le programme vous présente la liste.
+    months (list=[int]) La liste des numéros de mois de SWI à prendre en compte (la valeur tracée sera la moyenne de ces mois)
+    month_names (dict={int:str})    Le dictionnaire des numéros et noms de mois ({1:'janvier';…})
+    indicateur_dict (dict={'indic': str, 'titre': str, 'unit': str}) Le dictionnaire contenant le nom de l’indicateur SAA à tracer ('REND', 'SURF', ou 'PROD'), le nom complet qui sera utilisé dans le titre de la figure et l’unité
+    metadonnees (pandas.DataFrame) Le dataframe contenant pour chaque maille de la grille SAFRAN : son numéro, ses coordonnées, le nom du département, le numéro du département, le numéro de la région. Ces données sont issues du fichier CSV créé par le script joindre_numeros_de_mailles_et_departements.py
+    annees (list=[int]) La liste des années à tracer (dans le cas où offset est non nul, ce sont les années des rendements qu’il faut passer)
+    colored_by (str) (opt, default = 'culture') Sélection de la méthode de regroupement des données. 'culture' donne une couleur à chaque valeur de 'cultures_a_tracer'. 'departement' donne une couleur à chaque valeur de 'departement_a_tracer'
+    offset (int)    Le nombre d’années d’écart entre rendements et SWI (e.g. 1 pour le SWI de l’année précédent les rendements)
+    anom (bool) (opt, default=False) Présentation des résultats en anomalie par rapport à la moyenne (anom=True) ou en valeurs absolues (anom=False)
+    colors (list) (opt, default = ['blue','orange','green']) La liste des couleurs des éléments à représenter. Si le nombre d’éléments à représenter est supérieur au nombre de couleurs, la liste est répétée.
+
+    OUTPUTS
+    Affichage de la figure sur la sortie principale
+    Enregistrement de la figure au format PNG dans le dossier courant
     '''
+    
+    #On ferme tout plot pré-existant
     plt.close()
+
+    #Création du titre
     titre_offset=' de l’année précédente' if offset==1 else ''
-    if colors=={}:
-        titre=f'Nuage de points des {indicateur_dict['titre'].lower()} en fonction\ndu SWI UNIFORME du mois de {month_names[months[0]]}{titre_offset}\npour les départements {'-'.join(departements_a_tracer)}{'\nANOMALIES' if anom else ''}'
+    if colored_by=='culture':
+        titre=f'Nuage de points des {indicateur_dict['titre'].lower()} en fonction du SWI UNIFORME du mois de {month_names[months[0]]}{titre_offset} pour les départements {'-'.join(departements_a_tracer)}{' ANOMALIES' if anom else ''}'
+    elif colored_by=='departement':
+        titre=f'Nuage de points des {indicateur_dict['titre'].lower()} du {[c[3:] for c in cultures if cultures_a_tracer[0] in c][0]} en fonction du SWI UNIFORME du mois de {month_names[months[0]]}{titre_offset}{' ANOMALIES' if anom else ''}'
     else:
-        titre=f'Nuage de points des {indicateur_dict['titre'].lower()} du {[c[3:] for c in cultures if cultures_a_tracer[0] in c][0]} en fonction\ndu SWI UNIFORME du mois de {month_names[months[0]]}{titre_offset}{'\nANOMALIES' if anom else ''}'
+        return('Argument colored_by incorrect. colored_by doit être égal à "culture" ou "departement"')
+    titre_wrapped=textwrap.fill(titre,width=70)
+
+    #Création du nom d’enregistrement
     depts_savename= f'depts_{'-'.join(departements_a_tracer)}' if len(departements_a_tracer)<=20 else 'too_many_depts'
     savename=f'{depts_savename}_scatter{'_ANOM' if anom else ''}_cult_{'-'.join(cultures_a_tracer)}_SWI-month{'-'.join([str(m) for m in months])}_offestN-{offset}.png'
-    colors={'11':'blue','24':'orange','13':'green'}
+
+    #Tracé de la figure
     fig = plt.figure(figsize=(15,15))
+
+    symbols=['.','*']#,'+','o']     #Liste des symboles à utiliser pour les différentes séries
+    counter=0                       #Le compteur permet d’itérer sur la liste des couleurs et des symboles.
+
     for cult in cultures_a_tracer:
-        c=colors[cult]
-        counter=0
-        symbols=['.','*']#,'+','o']
+
+        first_dep=True              #On veut identifier la première itération de la boucle pour n’inscrire la légende qu’une fois par culture.
+
         for dept in departements_a_tracer:
-            sym=symbols[0] if colors=={} else symbols[counter%len(symbols)]
-            c=c if colors=={} else colors[counter%len(colors)]
-            counter+=1
+
+            #Définition des paramètres de forme
+            nom_culture=None if first_dep==False else [c[3:] for c in cultures if cult in c][0]
+            sym=symbols[counter%len(symbols)] if colored_by=='departement' else '.'
+            col=colors[counter%len(colors)]
+            label=nom_culture if colored_by=='culture' else metadonnees[metadonnees.loc[:,'INSEE_DEP']==dept]['NOM'].values[0]
+
+            #Extraction des données
             data_SAA=SAA[dept][cult]
             data_SWI=SWI[dept][SWI[dept].index.isin(annees-offset)]
+
+            #Il arrive qu’un département n’ai pas de rendement de la culture pendant une ou plusieurs années, dans ce cas il est ignoré
+            if len(data_SWI)!=len(data_SAA):
+                print(f'Département {dept} ignoré. Jeux de données de tailles différentes.')
+                continue
+
+            #Calcul des anomalies
             if anom:
                 data_SAA=data_SAA-data_SAA.mean()
                 data_SWI=data_SWI-data_SWI.mean()
-            nom_culture=None
-            if dept==departements_a_tracer[0]:
-                nom_culture=[c[3:] for c in cultures if cult in c][0]
-            label=nom_culture if colors=={} else metadonnees[metadonnees.loc[:,'INSEE_DEP']==dept]['NOM'].values[0]
-            plt.scatter(data_SWI[data_SWI.index.isin(annees-offset)],data_SAA,label=label,color=c,marker=sym)
+            
+            plt.scatter(data_SWI[data_SWI.index.isin(annees-offset)],data_SAA,label=label,color=col,marker=sym)
 
+            #Incrémentation du compteur
+            counter = counter + 1 if colored_by=='departement' else counter
+            first_dep=False
+        counter = counter + 1 if colored_by=='culture' else counter
+    
+    #Mise en forme et sauvegarde de la figure
     plt.xlabel('SWI UNIFORME',fontweight='bold')
     plt.ylabel(indicateur_dict['unit'],fontweight='bold')
-    plt.title(titre,fontweight='bold')
+    plt.title(titre_wrapped,fontweight='bold')
     plt.legend()
     plt.grid()
     plt.savefig(savename)
@@ -219,40 +267,74 @@ def Boxplot_SWI(SWI,SAA,annees,months,culture_a_tracer,offset:int=0,sort_by:str=
     print(f'Figure enregistrée sous :\n{os.path.abspath(savename)}')
     plt.show()
 
-def Plot_scatter_SAAmoy_SWImoy(SWI,SAA,cult_num,cultures,metadonnees,indicateur_dict,symbols:list=['o','P','p']):
+def Plot_scatter_SAAmoy_SWImoy(SWI,SAA,cult_num,cultures,month,month_names,metadonnees,indicateur_dict,symbols:list=['o','P','p']):
+    '''
+    Cette fonction trace un unique nuage de point du rendement moyen de la période en fonction du SWI moyen de la période pour chaque département (un point par département).
+    Les points sont colorés en fonction de leur distance au point ayant la plus petite valeur de SAA*SWI.
+    Pour chaque point on trace une barre représentant 1 écart type de part et d’autre du point dans les deux dimmension (SAA et SWI).
+
+    INPUTS
+    SWI (dict={str:pandas.DataFrame})   Les données de SWI issues de la fonction Retrieve_data_SWI
+    SAA (dict={str:dict={str:pandas.DataFrame}})    Les données de SWI issues de la fonction Retrieve_data_SAA
+    cult_num (str)  Le numéro à deux chiffres identifiant la culture à tracer (e.g. '11')
+    cultures (list=[str]) La liste numérotée des noms des cultures (e.g. ['11 Blé tendre d'hiver', '12 Blé tendre de printemps'])
+    month (int) Le numéro du mois de SWI pris en compte (sert uniquement au légendage de la figure)
+    month_names (dict={int:str})    Le dictionnaire des numéros et noms de mois ({1:'janvier';…}) (sert uniquement au légendage de la figure)
+    metadonnees (pandas.DataFrame) Le dataframe contenant pour chaque maille de la grille SAFRAN : son numéro, ses coordonnées, le nom du département, le numéro du département, le numéro de la région. Ces données sont issues du fichier CSV créé par le script joindre_numeros_de_mailles_et_departements.py
+    indicateur_dict (dict={'indic': str, 'titre': str, 'unit': str}) Le dictionnaire contenant le nom de l’indicateur SAA à tracer ('REND', 'SURF', ou 'PROD'), le nom complet qui sera utilisé dans le titre de la figure et l’unité
+    symbols (list=[str]) (opt, default = ['o','P','p']) La liste des figurés à utiliser pour représenter les points de données. La liste est répétée autant de fois que nécessaire pour tracer tous les départements.
+        
+    OUTPUTS
+    Affichage de la figure sur la sortie principale
+    Enregistrement de la figure au format PNG dans le dossier courant
+    '''
+
+    #On initialise des dictionnaires pour enregistrer les valeurs moyennes par département à tracer.
     SWImoy={}
     SAAmoy={}
-    culture_name=[c[3:] for c in cultures if cult_num in c][0]
-    titre=f'Rendements moyens du {culture_name} sur la période 2000-2023 en fonction du SWI UNIFORME de juin'
-    titre_wrapped=textwrap.fill(titre,width=70)
-    depts_savename= f'depts_{'-'.join(departements_a_tracer)}' if len(departements_a_tracer)<=90 else 'all_depts'
-    savename=f'scatter_SAAmoy_SWImoy_{depts_savename}_cult_{cult_num}.png'
-    plt.figure(figsize=(20,20))
+
+    #Calcul des moyennes et écarts types
     for dept in SWI:
-        if len(SAA[dept][cult_num])>0:
+        if len(SAA[dept][cult_num])>0:  #Certains département n’ont pas de valeurs de rendements du tout (e.g. 75 Paris) ou pas de certaines cultures. On les ignore. 
             SWImoy[dept]=[np.mean(SWI[dept]),np.std(SWI[dept])]
             SAAmoy[dept]=[np.mean(SAA[dept][cult_num]),np.std(SAA[dept][cult_num])]
     
+    #On réuni le tout dans un dataframe pour pouvoir calculer plus facilement la couleur de chaque point
     data=pd.DataFrame({'SWImoy':[SWImoy[dept][0] for dept in SWImoy],
                        'SAAmoy':[SAAmoy[dept][0] for dept in SAAmoy]},
                        index=[dept for dept in SWImoy])
 
+    #Le "score" est une valeur qui sert à identifier un point extrême. J’ai choisi de faire le produit du SWI moyen et du SAA moyen.
     data['score']=(data['SWImoy'])*(data['SAAmoy'])
+
+    #Le point de référence est celui qui a le score le plus faible.
     ref_data=data[data['score']==data['score'].min()]
-    print(ref_data)
+    print(f'Les couleurs sont attribuées en fonction de la distance de chaque point au département :\n{ref_data}')
+
+    #Calcul de la distance de chaque point au point de référence
     data['SWImoy_ref']=ref_data['SWImoy'].values.repeat(len(data))
     data['SAAmoy_ref']=ref_data['SAAmoy'].values.repeat(len(data))
     data['distance_to_ref']=np.linalg.norm(data[['SWImoy','SAAmoy']].values - data[['SWImoy_ref','SAAmoy_ref']].values,axis=1)
 
+    #Création du titre
+    culture_name=[c[3:] for c in cultures if cult_num in c][0]
+    titre=f'Rendements moyens du {culture_name} sur la période 2000-2023 en fonction du SWI UNIFORME de {month_names[month]}'
+    titre_wrapped=textwrap.fill(titre,width=70)
+
+    #Création du nom de sauvegarde
+    depts_savename= f'depts_{'-'.join(departements_a_tracer)}' if len(departements_a_tracer)<=90 else 'all_depts'
+    savename=f'scatter_SAAmoy_SWImoy_{depts_savename}_cult_{cult_num}.png'
+
+    #Tracé de la figure
+    plt.figure(figsize=(20,20))
+    
     norm = mcolors.Normalize(vmin=data['distance_to_ref'].min(), vmax=data['distance_to_ref'].max())
     cmap = plt.cm.plasma
     colors = cmap(norm(data['distance_to_ref'].values))
     
-    counter=0
-    for dept in SWImoy:
+    for i,dept in enumerate(SWImoy):
         label=metadonnees[metadonnees.loc[:,'INSEE_DEP']==dept]['NOM'].values[0]
-        plt.errorbar(SWImoy[dept][0],SAAmoy[dept][0],xerr=SWImoy[dept][1],yerr=SAAmoy[dept][1], fmt=symbols[counter%len(symbols)],markersize=10,label=label,color=colors[counter])
-        counter+=1
+        plt.errorbar(SWImoy[dept][0],SAAmoy[dept][0],xerr=SWImoy[dept][1],yerr=SAAmoy[dept][1], fmt=symbols[i%len(symbols)],markersize=10,label=label,color=colors[i])
 
     plt.xlabel('SWI UNIFORME',fontweight='bold',fontsize=15)
     plt.ylabel(indicateur_dict['unit'],fontweight='bold',fontsize=15)
@@ -268,19 +350,19 @@ def Plot_scatter_SAAmoy_SWImoy(SWI,SAA,cult_num,cultures,metadonnees,indicateur_
 
 #departements_a_tracer=['02','10','27','28','45','51','60','77','78','89','91','95']
 departements_a_tracer=['29','14','62','77','67','21','41','85','24','63','38','64','31','34','83']
-departements_a_tracer=['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11',
-       '12', '13', '14', '15', '16', '17', '18', '19', '21', '22',
-       '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33',
-       '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44',
-       '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55',
-       '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66',
-       '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77',
-       '78', '79', '80', '81', '82', '83', '84', '85', '86', '87', '88',
-       '89', '90', '91', '92', '93', '94', '95']
+#departements_a_tracer=['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11',
+#       '12', '13', '14', '15', '16', '17', '18', '19', '21', '22',
+#       '23', '24', '25', '26', '27', '28', '29', '30', '31', '32', '33',
+#       '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44',
+#       '45', '46', '47', '48', '49', '50', '51', '52', '53', '54', '55',
+#       '56', '57', '58', '59', '60', '61', '62', '63', '64', '65', '66',
+#       '67', '68', '69', '70', '71', '72', '73', '74', '75', '76', '77',
+#       '78', '79', '80', '81', '82', '83', '84', '85', '86', '87', '88',
+#       '89', '90', '91', '92', '93', '94', '95']
 
 colors = plt.cm.Dark2(np.linspace(0, 1, 8))
 
-cultures_a_tracer=['11']    #,'24','13']
+cultures_a_tracer=['11','24','13']    #,'24','13']
 indicateur='1' #Rendements
 months=[6] #[1,2,3,4,5,6,7,8,9,10,11,12]
 offset=0 #1
@@ -300,9 +382,15 @@ month_names={1:'janvier',
                  }
 
 
+#Chargement des données
+
 #SWI,months,depts_SWI,metadonnees=Retrieve_data_SWI(departements_a_tracer,months)
 #SAA,depts_num_name,cultures,indicateur_dict,annees,depts_SAA,cultures_a_tracer=Retrieve_data_SAA(departements_a_tracer,cultures_a_tracer,indicateur)
+
+#Tracés
+
 #Plot_TS_and_scatter_SAA_SWI(SWI,SAA,cultures_a_tracer,months,month_names,offset,indicateur_dict,metadonnees,depts_SWI,annees,cultures,anom=False)
-#Plot_scatter_SAA_SWI(SWI,SAA,departements_a_tracer,cultures_a_tracer,months,month_names,offset,anom=False,colors=colors)
+#Plot_scatter_SAA_SWI(SWI,SAA,departements_a_tracer,[cultures_a_tracer[0]],months,month_names,indicateur_dict,metadonnees,annees,colored_by='departement',offset=offset,anom=False,colors=colors)
+#Plot_scatter_SAA_SWI(SWI,SAA,departements_a_tracer,cultures_a_tracer,months,month_names,indicateur_dict,metadonnees,annees,colored_by='culture',offset=offset,anom=False)
 #Boxplot_SWI(SWI,SAA,annees,months,cultures_a_tracer[0],offset=offset,figsize=(len(departements_a_tracer)+5,15))
-#Plot_scatter_SAAmoy_SWImoy(SWI,SAA,cultures_a_tracer[0],cultures,metadonnees,indicateur_dict)
+#Plot_scatter_SAAmoy_SWImoy(SWI,SAA,cultures_a_tracer[0],cultures,months[0],month_names,metadonnees,indicateur_dict)
