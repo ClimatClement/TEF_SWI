@@ -4,10 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from config import BDD_SWI_AVEC_DEPARTEMENTS, BDD_SWI_DATA_PATH, OUTPUT_DATA_PATH
+from config import BDD_SWI_DATA_PATH, OUTPUT_DATA_PATH, BDD_DEPARTEMENTS_PATH, BDD_MAILLES_AVEC_DEPARTEMENTS_PATH
 from fonctions_communes.fonctions import sel_options
 
-#FONCTIONS
 
 def Retrieve_data_SWI(departements_a_tracer:list=[],months:list=[]):
     '''
@@ -27,7 +26,7 @@ def Retrieve_data_SWI(departements_a_tracer:list=[],months:list=[]):
     metadonnees (pandas.DataFrame) Le dataframe contenant pour chaque maille de la grille SAFRAN : son numéro, ses coordonnées, le nom du département, le numéro du département, le numéro de la région. Ces données sont issues du fichier CSV créé par le script joindre_numeros_de_mailles_et_departements.py
     '''
 
-    metadonnees=pd.read_csv(BDD_SWI_AVEC_DEPARTEMENTS,sep=';')
+    metadonnees=pd.read_csv(BDD_MAILLES_AVEC_DEPARTEMENTS_PATH, sep=';')
 
     #Traitement des cas où les arguments departements_a_tracer et months ne sont pas passés.
     if len(departements_a_tracer)==0:

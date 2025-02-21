@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 fonctions_dir="/media/cl-ment-devenet/Partage/work/TEF/code/fonctions_communes/"
 sys.path.append(fonctions_dir)
 
-from fonctions import *
+from fonctions_communes.fonctions import *
 
 #FONCTIONS
 
