@@ -8,21 +8,15 @@ from config import (BDD_SWI_DATA_PATH, BDD_MAILLES_AVEC_DEPARTEMENTS_PATH, BDD_M
 
 
 def calculer_donnees_humidite_par_departements_et_mois() -> None:
-    df = _calculer_donnees_humidite()
+    df_mailles = _importer_donnees_mailles().rename(columns={'#num_maille': 'NUMERO'})
+    df_swi = _importer_donnees_swi()
+    df = pandas.merge(df_swi, df_mailles, on="NUMERO")
     df = (df.
-          groupby(['NOM', 'INSEE_DEP', 'INSEE_REG', 'annee', 'mois', 'annee_mois'])[['SWI_UNIF_MENS3', 'reserve_mm', 'humidite_mm']].
+          groupby(['NOM', 'INSEE_DEP', 'INSEE_REG', 'annee', 'mois', 'annee_mois'])[['SWI_UNIF_MENS3', 'reserve_mm']].
           mean().
           reset_index()
           )
     df.to_csv(BDD_DATA_HUMIDITES_PAR_DEPARTEMENTS_ET_MOIS_PATH, index=False, sep=";", float_format="%.2f")
-
-
-def _calculer_donnees_humidite() -> DataFrame:
-    df_mailles = _importer_donnees_mailles().rename(columns={'#num_maille': 'NUMERO'})
-    df_swi = _importer_donnees_swi()
-    df = pandas.merge(df_swi, df_mailles, on="NUMERO")
-    df['humidite_mm'] = (df['SWI_UNIF_MENS3'] * df['reserve_mm']).round()
-    return df
 
 
 def _importer_donnees_mailles() -> DataFrame:

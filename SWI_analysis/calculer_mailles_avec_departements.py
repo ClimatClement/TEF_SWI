@@ -2,7 +2,7 @@ import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point
 
-from config import BDD_CONTOURS_DEPARTEMENTS_PATH, BDD_MAILLES_AVEC_DEPARTEMENTS_PATH, BDD_SWI_METADATA_PATH, BDD_DEPARTEMENTS_PATH
+from config import BDD_CONTOURS_DEPARTEMENTS_PATH, BDD_MAILLES_AVEC_DEPARTEMENTS_PATH, BDD_SWI_METADATA_PATH, BDD_DEPARTEMENTS_PATH, CRS_PROJET
 
 
 def calculer_mailles_avec_departements():
@@ -14,21 +14,23 @@ def calculer_mailles_avec_departements():
     Le résultat est un fichier CSV (sep = ';') contenant la liste des mailles, le nom du département, le numéro INSEE de département et le numéro INSEE de la région.
     '''
 
+    print("Calcul des mailles avec départements")
+
     ### On récupère les métadonnées de la grille SAFRAN
     df_metadonnees=pd.read_csv(BDD_SWI_METADATA_PATH,sep=';',header=4)
 
     ### On récupère ensuite les limites administratives des départements (France métropolitaine)
-    limit_depts=gpd.read_file(BDD_CONTOURS_DEPARTEMENTS_PATH)
-    df_departements = limit_depts.drop(columns='geometry')
+    gdf_contours_departements = gpd.read_file(BDD_CONTOURS_DEPARTEMENTS_PATH).to_crs(CRS_PROJET)
+    df_departements = gdf_contours_departements.drop(columns='geometry')
 
     ### Petite transformation du dataframe des métadonnées SAFRAN en Geodataframe
     geometry = [Point(xy) for xy in zip(df_metadonnees['lambx93'], df_metadonnees['lamby93'])]
-    gdf_metadonnees = gpd.GeoDataFrame(df_metadonnees, geometry=geometry, crs=limit_depts.crs)
+    gdf_metadonnees = gpd.GeoDataFrame(df_metadonnees, geometry=geometry, crs=CRS_PROJET)
 
     ### Jointure des deux jeux de données
     gdf_result = gpd.sjoin(
-        gdf_metadonnees[['#num_maille','lambx93','lamby93','geometry']],
-        limit_depts,
+        gdf_metadonnees[['#num_maille','lambx93','lamby93','lambx','lamby','geometry']],
+        gdf_contours_departements,
         how='left'
         )
 
@@ -39,8 +41,8 @@ def calculer_mailles_avec_departements():
 
     ### On fait cette fois un joint par plus proche voisin
     nearest_join = gpd.sjoin_nearest(
-        coast_points[['#num_maille','lambx93','lamby93','geometry']],
-        limit_depts,
+        coast_points[['#num_maille','lambx','lamby','geometry']],
+        gdf_contours_departements,
         how='left',
         distance_col='distance_to_nearest'
         )

@@ -9,6 +9,7 @@ dependencies:
   - matplotlib
   - numpy
   - pygeos
+  - scipy
 platforms:
   - osx-arm64
   - osx-64
